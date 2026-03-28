@@ -1,0 +1,45 @@
+# Build directories (keep bin/ for compiled executables)
+build/
+obj/
+*.a
+*.o
+*.tmp
+
+# Temporary files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.sln.DotSettings
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+
+# Output files
+*.out
+output.txt
+received.txt
+decrypted.txt
+encrypted.bin
+
+# System files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.bak
+*.backup

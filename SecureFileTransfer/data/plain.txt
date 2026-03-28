@@ -1,0 +1,24 @@
+This is a test file for DES encryption and decryption demonstration.
+SecureFileTransfer Project - Author: PhongPKF
+The goal is to encrypt data on the client side, transmit it over TCP network,
+and decrypt it on the server side using the Data Encryption Standard (DES) algorithm.
+
+DES Encryption Algorithm:
+- Block size: 64 bits (8 bytes)
+- Key size: 56 effective bits (64 bits with parity)
+- Rounds: 16 Feistel rounds
+- Mode: ECB (Electronic Codebook) with PKCS#7 padding
+
+Network Protocol:
+1. Client reads plaintext file
+2. Client applies PKCS#7 padding
+3. Client encrypts each 64-bit block using DES
+4. Client connects to server via TCP socket
+5. Client sends ciphertext file size (8 bytes)
+6. Client sends encrypted ciphertext
+7. Server receives data in reverse order
+8. Server decrypts using same DES key
+9. Server removes padding and saves plaintext
+
+This is a demonstration of combining cryptography with network communication.
+All data is transmitted securely using symmetric key encryption.
