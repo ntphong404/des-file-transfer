@@ -165,7 +165,7 @@ Nếu 2 máy khác mạng:
 
 ## 📝 License
 
-Dự án học tập - CS101 & BMTT
+Dự án học tập - CSAT & BMTT
 
 ## 👨‍💻 Tác giả
 
@@ -173,7 +173,7 @@ Sinh viên Nam 4 - Học kỳ II
 
 ---
 
-**Ghi chú**: File này được tạo tự động. Để chi tiết hơn, xem:
+**Ghi chú**: Để biết chi tiết hơn, xem:
 
 - `GUI/GUI_USAGE.md` - Hướng dẫn GUI chi tiết
 - `SecureFileTransfer/ARCHITECTURE.md` - Kiến trúc C++
