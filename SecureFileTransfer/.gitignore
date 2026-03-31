@@ -22,7 +22,6 @@ obj/
 # CMake
 CMakeCache.txt
 CMakeFiles/
-Makefile
 cmake_install.cmake
 
 # Output files
