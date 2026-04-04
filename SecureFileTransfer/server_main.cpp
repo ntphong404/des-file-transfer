@@ -73,11 +73,21 @@ bool recvUint64(SocketHandle sock, uint64_t &value)
     return true;
 }
 
+// Convert UTF-8 → wstring (dùng chung)
+static std::wstring utf8ToWide(const std::string &s)
+{
+    if (s.empty()) return {};
+    int len = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
+    std::wstring ws(len - 1, 0);
+    MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, &ws[0], len);
+    return ws;
+}
+
 // Ensure a directory exists (create if not present)
 void ensureDirectory(const std::string &path)
 {
 #ifdef _WIN32
-    CreateDirectoryA(path.c_str(), NULL);
+    CreateDirectoryW(utf8ToWide(path).c_str(), NULL);
 #else
     mkdir(path.c_str(), 0755);
 #endif

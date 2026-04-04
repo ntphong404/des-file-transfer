@@ -10,9 +10,24 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 namespace DES
 {
+
+#ifdef _WIN32
+    // Chuyển UTF-8 string → wstring để Windows file API hiểu tên tiếng Việt
+    static std::wstring utf8ToWide(const std::string &s)
+    {
+        if (s.empty()) return {};
+        int len = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
+        std::wstring ws(len - 1, 0);
+        MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, &ws[0], len);
+        return ws;
+    }
+#endif
 
     // Apply PKCS#7 padding
     std::vector<uint8_t> padData(const std::vector<uint8_t> &data)
@@ -70,34 +85,60 @@ namespace DES
         return true;
     }
 
-    // Read file into memory
+    // Read file into memory (hỗ trợ tên file UTF-8 / tiếng Việt)
     std::vector<uint8_t> readFile(const std::string &filename)
     {
+#ifdef _WIN32
+        FILE *fp = _wfopen(utf8ToWide(filename).c_str(), L"rb");
+        if (!fp)
+        {
+            std::cerr << "Error: Cannot open file " << filename << std::endl;
+            return {};
+        }
+        fseek(fp, 0, SEEK_END);
+        long sz = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+        std::vector<uint8_t> data(sz);
+        fread(data.data(), 1, sz, fp);
+        fclose(fp);
+        return data;
+#else
         std::ifstream file(filename, std::ios::binary);
         if (!file.is_open())
         {
             std::cerr << "Error: Cannot open file " << filename << std::endl;
             return {};
         }
-
         std::vector<uint8_t> data((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         file.close();
         return data;
+#endif
     }
 
-    // Write byte vector to file
+    // Write byte vector to file (hỗ trợ tên file UTF-8 / tiếng Việt)
     bool writeFile(const std::string &filename, const std::vector<uint8_t> &data)
     {
+#ifdef _WIN32
+        FILE *fp = _wfopen(utf8ToWide(filename).c_str(), L"wb");
+        if (!fp)
+        {
+            std::cerr << "Error: Cannot open file " << filename << " for writing" << std::endl;
+            return false;
+        }
+        fwrite(data.data(), 1, data.size(), fp);
+        fclose(fp);
+        return true;
+#else
         std::ofstream file(filename, std::ios::binary);
         if (!file.is_open())
         {
             std::cerr << "Error: Cannot open file " << filename << " for writing" << std::endl;
             return false;
         }
-
         file.write(reinterpret_cast<const char *>(data.data()), data.size());
         file.close();
         return true;
+#endif
     }
 
     // Convert byte to binary string
