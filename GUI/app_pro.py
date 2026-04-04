@@ -47,7 +47,8 @@ class TransferThread(QThread):
                 self.cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                universal_newlines=True,
+                encoding='utf-8',      # C++ stdout là UTF-8, không dùng system encoding
+                errors='replace',      # ký tự lỗi → '?' thay vì crash
                 cwd=self.cwd
             )
             for line in self.proc.stdout:

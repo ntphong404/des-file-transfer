@@ -1,28 +1,34 @@
-# Kiến Trúc DES Encryption Project
+# Kiến Trúc DES File Transfer Pro
 
 ## 1. Tổng Quan Kiến Trúc
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    SecureFileTransfer                        │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  ┌──────────────────────┐           ┌──────────────────────┐ │
-│  │   CLIENT APPLICATION │           │   SERVER APPLICATION │ │
-│  │   (client_main.cpp)  │           │   (server_main.cpp)  │ │
-│  └──────────────────────┘           └──────────────────────┘ │
-│            │                                  │               │
-│            ├─ Read File ─────────────────────┤              │
-│            │ Encrypt (DES) ─────────────────>│              │
-│            │ Send (Socket) ─────────────────>│             │
-│            │                     Decrypt (DES) ──┐          │
-│            │                     Write File <────┘          │
-│            │                                                │
-└─────────────────────────────────────────────────────────────┘
-             │                                    │
-             └────────────────────────────────────┘
-                      TCP/IP Network
-                      (Port 5000)
+┌──────────────────────────────────────────────────────────────────────┐
+│                     DES File Transfer Pro                            │
+├────────────────────────────┬─────────────────────────────────────────┤
+│   MÁY GỬI (Client)        │   MÁY NHẬN (Server)                     │
+│                            │                                          │
+│  ┌──────────────────────┐  │  ┌──────────────────────┐              │
+│  │    GUI (PyQt6)       │  │  │    GUI (PyQt6)       │              │
+│  │    app_pro.py        │  │  │    app_pro.py        │              │
+│  └─────────┬────────────┘  │  └─────────┬────────────┘              │
+│            │ subprocess    │             │ subprocess                 │
+│  ┌─────────▼────────────┐  │  ┌─────────▼────────────┐              │
+│  │  client_send.exe     │  │  │  server_recv.exe     │              │
+│  │  client_main.cpp     │  │  │  server_main.cpp     │              │
+│  └─────────┬────────────┘  │  └─────────┬────────────┘              │
+│            │               │             │                            │
+│  ┌─────────▼────────────┐  │  ┌─────────▼────────────┐              │
+│  │  DES Layer           │  │  │  DES Layer           │              │
+│  │  (des_core/utils)    │  │  │  (des_core/utils)    │              │
+│  └─────────┬────────────┘  │  └─────────┬────────────┘              │
+│            │               │             │                            │
+│  ┌─────────▼────────────┐  │  ┌─────────▼────────────┐              │
+│  │  Network Layer       │  │  │  Network Layer       │              │
+│  │  (socket_utils)      ├──┼──►  (socket_utils)      │              │
+│  └──────────────────────┘  │  └──────────────────────┘              │
+│     TCP Multi-File ────────┼────────────────────────────────────►   │
+└────────────────────────────┴─────────────────────────────────────────┘
 ```
 
 ## 2. Kiến Trúc Lớp (Layer Architecture)
@@ -59,87 +65,80 @@
 
 ## 3. Luồng Dữ Liệu (Data Flow)
 
-### Phía Client (Encrypt & Send)
+### Phía Client (Encrypt & Send — Multi-File)
 
 ```
-Plain Text File
+Danh sách N file inputs
       │
-      ↓
+      ▼
 ┌─────────────────────┐
-│ Read File           │ (readFile)
+│ getUtf8Args()       │  Đọc argv từ GetCommandLineW (UTF-8 safe)
 └─────────────────────┘
       │
-      ↓ byte vector (plaintext)
+      ▼ Với mỗi file:
 ┌─────────────────────┐
-│ PKCS#7 Padding      │ (padData)
+│ readFile()          │  _wfopen (Windows UTF-8 filename)
+└─────────────────────┘
+      │ byte vector (plaintext)
+      ▼
+┌─────────────────────┐
+│ padData (PKCS#7)    │  Align to 8-byte block boundary
 └─────────────────────┘
       │
-      ↓ byte vector (padded, multiple of 8 bytes)
+      ▼ Với mỗi 8-byte block:
 ┌─────────────────────┐
-│ For each 8-byte     │
-│ block:              │ (generateRoundKeys → encryptBlock)
-│ ┌───────────────┐   │
-│ │ IP Permute    │   │
-│ ├───────────────┤   │
-│ │ 16 Feistel    │   │
-│ │ Rounds        │   │
-│ ├───────────────┤   │
-│ │ FP Permute    │   │
-│ └───────────────┘   │
+│ encryptBlock (DES)  │  IP → 16 Feistel rounds → FP
+│ × (size/8) lần      │
 └─────────────────────┘
+      │ ciphertext vector
+      ▼
+┌─────────────────────────────────┐
+│ sendUint32(num_files)           │  4 bytes
+│ For each file:                  │
+│   sendUint32(filename_len)      │  4 bytes
+│   sendData(filename bytes)      │  UTF-8 string
+│   sendUint64(data_size)         │  8 bytes
+│   sendData(ciphertext)          │  N bytes
+└─────────────────────────────────┘
       │
-      ↓ byte vector (ciphertext)
-┌─────────────────────┐
-│ TCP Socket Send     │ (sendData)
-│ 1. Send file size   │
-│ 2. Send encrypted   │
-│    data             │
-└─────────────────────┘
-      │
-      ↓
-  Network →
+      ▼
+  TCP ──────────────────────────────►
 ```
 
-### Phía Server (Receive & Decrypt)
+### Phía Server (Receive & Decrypt — Multi-File)
 
 ```
-Network ←
+  ◄────────────────────────────── TCP
       │
-      ↓
+      ▼
+┌─────────────────────────────────┐
+│ recvUint32(num_files)           │  Số lượng file
+│ For each file:                  │
+│   recvUint32(filename_len)      │
+│   receiveExact(filename bytes)  │  Tên file UTF-8
+│   recvUint64(data_size)         │
+│   receiveExact(ciphertext)      │
+└─────────────────────────────────┘
+      │ ciphertext + filename
+      ▼ Với mỗi 8-byte block:
 ┌─────────────────────┐
-│ TCP Socket Receive  │ (receiveData)
-│ 1. Receive size     │
-│ 2. Receive chunks   │
+│ decryptBlock (DES)  │  IP → 16 Feistel rounds (reverse) → FP
+│ × (size/8) lần      │
 └─────────────────────┘
-      │
-      ↓ byte vector (ciphertext)
+      │ padded plaintext
+      ▼
 ┌─────────────────────┐
-│ For each 8-byte     │
-│ block:              │ (generateRoundKeys → decryptBlock)
-│ ┌───────────────┐   │
-│ │ IP Permute    │   │
-│ ├───────────────┤   │
-│ │ 16 Feistel    │   │
-│ │ Rounds        │   │
-│ │ (reverse)     │   │
-│ ├───────────────┤   │
-│ │ FP Permute    │   │
-│ └───────────────┘   │
+│ unpadData (PKCS#7)  │  Validate & remove padding
 └─────────────────────┘
+      │ plaintext
+      ▼
+┌─────────────────────────────────┐
+│ sanitizeFilename()              │  Ngăn path traversal attack
+│ writeFile(outDir/filename)      │  _wfopen (UTF-8 safe)
+└─────────────────────────────────┘
       │
-      ↓ byte vector (decrypted)
-┌─────────────────────┐
-│ Remove PKCS#7       │ (unpadData)
-│ Padding             │
-└─────────────────────┘
-      │
-      ↓ byte vector (plaintext)
-┌─────────────────────┐
-│ Write File          │ (writeFile)
-└─────────────────────┘
-      │
-      ↓
-Decrypted File (Same as original)
+      ▼
+File lưu vào output_dir với tên gốc
 ```
 
 ---

@@ -83,6 +83,25 @@ static std::wstring utf8ToWide(const std::string &s)
     return ws;
 }
 
+#ifdef _WIN32
+// Lấy args đúng từ GetCommandLineW() → UTF-8 (hỗ trợ tiếng Việt)
+static std::vector<std::string> getUtf8Args()
+{
+    int wargc;
+    LPWSTR *wargv = CommandLineToArgvW(GetCommandLineW(), &wargc);
+    std::vector<std::string> args;
+    for (int i = 0; i < wargc; i++)
+    {
+        int sz = WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, nullptr, 0, nullptr, nullptr);
+        std::string s(sz - 1, '\0');
+        WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, &s[0], sz, nullptr, nullptr);
+        args.push_back(s);
+    }
+    LocalFree(wargv);
+    return args;
+}
+#endif
+
 // Ensure a directory exists (create if not present)
 void ensureDirectory(const std::string &path)
 {
@@ -125,9 +144,17 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+#ifdef _WIN32
+    auto args = getUtf8Args();
+    int port              = std::atoi(args[1].c_str());
+    std::string outputDir = args[2];
+    std::string keyStr    = args[3];
+#else
     int port = std::atoi(argv[1]);
     std::string outputDir = argv[2];
     std::string keyStr    = argv[3];
+#endif
+
 
     if (port <= 0 || port > 65535)
     {

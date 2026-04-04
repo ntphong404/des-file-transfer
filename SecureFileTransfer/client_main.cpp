@@ -20,9 +20,32 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 using namespace DES;
 using namespace Network;
+
+#ifdef _WIN32
+// Windows argv[] dùng ANSI codepage, không phải UTF-8.
+// Hàm này lấy args đúng từ GetCommandLineW() → UTF-8.
+static std::vector<std::string> getUtf8Args()
+{
+    int wargc;
+    LPWSTR *wargv = CommandLineToArgvW(GetCommandLineW(), &wargc);
+    std::vector<std::string> args;
+    for (int i = 0; i < wargc; i++)
+    {
+        int sz = WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, nullptr, 0, nullptr, nullptr);
+        std::string s(sz - 1, '\0');
+        WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, &s[0], sz, nullptr, nullptr);
+        args.push_back(s);
+    }
+    LocalFree(wargv);
+    return args;
+}
+#endif
 
 void printUsage(const char *programName)
 {
@@ -83,14 +106,24 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+#ifdef _WIN32
+    // Lấy args tình UTF-8 để hỗ trợ tên file tiếng Việt
+    auto args = getUtf8Args();
+    std::string serverIP = args[1];
+    int port = std::atoi(args[2].c_str());
+    std::string keyStr = args[3];
+    std::vector<std::string> inputFiles;
+    for (size_t i = 4; i < args.size(); i++)
+        inputFiles.push_back(args[i]);
+#else
     std::string serverIP = argv[1];
     int port = std::atoi(argv[2]);
     std::string keyStr = argv[3];
-
-    // Collect all input file paths
     std::vector<std::string> inputFiles;
     for (int i = 4; i < argc; i++)
         inputFiles.push_back(argv[i]);
+#endif
+
 
     // Validate
     if (port <= 0 || port > 65535)

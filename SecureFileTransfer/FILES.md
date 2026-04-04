@@ -6,23 +6,23 @@
 SecureFileTransfer/
 │
 ├─ include/des/              # DES header files
-│  ├─ des_tables.h           - Khai báo bảng DES
-│  ├─ des_core.h             - Khai báo hàm mã hóa
-│  └─ des_utils.h            - Khai báo file I/O
+│  ├─ des_tables.h           - Khai báo bảng DES (IP, E, S-box, P, PC1, PC2)
+│  ├─ des_core.h             - Khai báo hàm mã hóa / giải mã
+│  └─ des_utils.h            - Khai báo file I/O, padding
 │
 ├─ include/network/          # Network header files
-│  └─ socket_utils.h         - Khai báo TCP socket
+│  └─ socket_utils.h         - Khai báo TCP socket wrapper
 │
 ├─ src/des/                  # DES implementation
-│  ├─ des_tables.cpp         - Định nghĩa bảng (150 lines)
-│  ├─ des_core.cpp           - Thuật toán DES (250 lines)
-│  └─ des_utils.cpp          - File I/O + padding (150 lines)
+│  ├─ des_tables.cpp         - Định nghĩa bảng DES (~150 lines)
+│  ├─ des_core.cpp           - Thuật toán DES Feistel 16 vòng (~250 lines)
+│  └─ des_utils.cpp          - File I/O + PKCS#7 padding + UTF-8 support (~220 lines)
 │
 ├─ src/network/              # Network implementation
-│  └─ socket_utils.cpp       - Socket wrapper (300 lines)
+│  └─ socket_utils.cpp       - TCP socket cross-platform (~300 lines)
 │
-├─ client_main.cpp           # Ứng dụng CLIENT (150 lines)
-├─ server_main.cpp           # Ứng dụng SERVER (200 lines)
+├─ client_main.cpp           # Ứng dụng CLIENT (~260 lines)
+├─ server_main.cpp           # Ứng dụng SERVER (~290 lines)
 │
 ├─ bin/                      # Compiled executables
 │  ├─ client_send.exe        - Chạy trên máy gửi
@@ -33,195 +33,162 @@ SecureFileTransfer/
 ├─ data/
 │  └─ plain.txt              - File test (~800 bytes)
 │
-├─ Makefile                  # Build configuration (GNU Make)
-├─ build-mingw.bat           - Windows batch script build
+├─ Makefile                  - Build configuration (GNU Make)
+├─ build-mingw.bat           - Windows batch build script
 ├─ .gitignore                - Git configuration
 │
 └─ Documentation/
-   ├─ FILES.md               - This file (file listing)
+   ├─ FILES.md               - This file
    ├─ RUN.md                 - How to build & run
-   ├─ ARCHITECTURE.md        - System design & flow
-   └─ (Xem README.md ở ngoài cùng cho tổng quan)
+   └─ ARCHITECTURE.md        - System design & protocol
 ```
 
 ---
 
 ## 📄 Giải Thích File
 
-### Header Files (Khai Báo)
+### Header Files
 
 #### `include/des/des_tables.h`
-
-- **Mục đích**: Khai báo các bảng DES
-- **Xuất**: IP, S_BOX[8][4][16], P, PC1, PC2, LEFT_SHIFTS
-- **Dùng cho**: Hoán vị, thay thế bit
+- Khai báo các bảng DES chuẩn FIPS 46-3
+- Export: `IP[64]`, `IP_INV[64]`, `E[48]`, `S_BOX[8][4][16]`, `P[32]`, `PC1[56]`, `PC2[48]`, `LEFT_SHIFTS[16]`
 
 #### `include/des/des_core.h`
-
-- **Mục đích**: Khai báo hàm mã hóa cốt lõi
-- **Xuất**: generateRoundKeys, encryptBlock, decryptBlock, desF
-- **Dùng cho**: Mã hóa/giải mã block
+- Khai báo hàm mã hóa cốt lõi
+- Export: `generateRoundKeys`, `encryptBlock`, `decryptBlock`, `desF`
+- Type: `RoundKeys` (16 subkeys × 6 bytes)
 
 #### `include/des/des_utils.h`
-
-- **Mục đích**: Khai báo hàm file I/O
-- **Xuất**: padData, unpadData, readFile, writeFile, encryptFile, decryptFile
-- **Dùng cho**: Xử lý file và padding
+- Khai báo hàm file I/O và padding
+- Export: `padData`, `unpadData`, `readFile`, `writeFile`
+- Hỗ trợ tên file UTF-8 (tiếng Việt) trên Windows
 
 #### `include/network/socket_utils.h`
-
-- **Mục đích**: Khai báo socket TCP wrapper
-- **Xuất**: createServerSocket, connectToServer, sendData, receiveData
-- **Dùng cho**: Gửi nhận dữ liệu qua mạng
+- Khai báo TCP socket wrapper cross-platform
+- Export: `createServerSocket`, `acceptConnection`, `connectToServer`, `sendData`, `receiveExact`
 
 ---
 
-### Source Files (Triển Khai)
+### Source Files
 
 #### `src/des/des_tables.cpp` (~150 lines)
-
-- Định nghĩa tất cả bảng DES (FIPS 46-3 standard)
-- IP[64], S_BOX[8][4][16], E[48], P[32], PC1[56], PC2[48]
-- Các hằng số LEFT_SHIFTS[16]
+- Định nghĩa tất cả bảng DES theo chuẩn FIPS 46-3
+- IP, IP_INV, E (expansion), S_BOX[8], P, PC1, PC2, LEFT_SHIFTS
 
 #### `src/des/des_core.cpp` (~250 lines)
+- Thuật toán DES 16-round Feistel Network
+- `generateRoundKeys()` — Sinh 16 subkey từ 8-byte master key
+- `desF()` — Hàm F: Expansion → XOR → S-box → Permutation
+- `encryptBlock()` / `decryptBlock()` — Xử lý 1 block 64-bit
 
-- Triển khai thuật toán DES 16-round Feistel
-- **generateRoundKeys()** - Sinh 16 subkey từ master key
-- **desF()** - Hàm F (phức tạp nhất)
-- **encryptBlock()** - Mã hóa 1 block 64-bit
-- **decryptBlock()** - Giải mã 1 block 64-bit
-- Helper: getBit, permute
-
-#### `src/des/des_utils.cpp` (~150 lines)
-
-- PKCS#7 padding/unpadding
-- readFile, writeFile (binary I/O)
-- encryptFile, decryptFile (ECB mode)
+#### `src/des/des_utils.cpp` (~220 lines)
+- PKCS#7 padding / unpadding với validation
+- `readFile()` / `writeFile()` — Binary I/O hỗ trợ UTF-8 filename  
+  - Windows: dùng `_wfopen()` với wide string path
+  - Linux/macOS: dùng `std::ifstream` / `std::ofstream`
 
 #### `src/network/socket_utils.cpp` (~300 lines)
-
-- TCP socket implementation
-- Windows (Winsock2) & Unix (POSIX sockets)
-- Server: createServerSocket, acceptConnection
-- Client: connectToServer
-- Data: sendData, receiveData
-- Auto platform detection
+- TCP socket implementation cross-platform
+- Windows: Winsock2 (`ws2_32`)
+- Linux/macOS: POSIX sockets
+- `receiveExact()` — Đảm bảo nhận đủ N bytes (blocking)
 
 ---
 
 ### Application Files
 
-#### `client_main.cpp` (~150 lines)
+#### `client_main.cpp` (~260 lines)
 
-- **Nhiệm vụ**: Gửi file được mã hóa
-- **Luồng**: Read → Encrypt → Send
-- **I/O**:
-  - Input: data/plain.txt
-  - Output: Encrypted bytes qua TCP
+**Nhiệm vụ:** Mã hóa và gửi nhiều file qua TCP trong 1 kết nối.
 
-#### `server_main.cpp` (~200 lines)
+**Luồng:**
+```
+Parse UTF-8 args (CommandLineToArgvW)
+→ Read & Encrypt all files (DES ECB, PKCS#7)
+→ Connect TCP
+→ Send [num_files]
+→ For each file: Send [name_len][name][data_size][encrypted_data]
+```
 
-- **Nhiệm vụ**: Nhận và giải mã file
-- **Luồng**: Listen → Receive → Decrypt → Save
-- **I/O**:
-  - Input: Encrypted bytes từ TCP
-  - Output: output.txt (plaintext)
+**Usage:**
+```bash
+client_send.exe <ip> <port> <key> <file1> [file2] ...
+```
+
+#### `server_main.cpp` (~290 lines)
+
+**Nhiệm vụ:** Nhận nhiều file, giải mã, lưu đúng tên vào thư mục.
+
+**Luồng:**
+```
+Listen TCP (accept 1 client)
+→ Recv [num_files]
+→ For each file:
+    Recv [name_len][filename][data_size][ciphertext]
+    → Decrypt (DES) + unpad (PKCS#7)
+    → sanitizeFilename() (ngăn path traversal)
+    → writeFile(outputDir/filename)
+```
+
+**Usage:**
+```bash
+server_recv.exe <port> <output_dir> <key>
+```
 
 ---
 
 ### Build Configuration
 
 #### `Makefile`
-
-- GNU Make configuration
-- Tự động phát hiện OS (Windows/Linux/macOS)
-- Targets: all, clean, run-server, run-client, info
-
-#### `CMakeLists.txt`
-
-- CMake configuration (backup, không cần nếu dùng Make)
-- Hỗ trợ Windows/Linux/macOS
+- GNU Make, tự động phát hiện OS
+- Targets: `all`, `clean`, `clean-obj`, `run-server`, `run-client`, `info`, `help`
+- Flags: `-std=c++11 -Wall -Wextra -O2`
+- Link: `-lws2_32` (Windows Winsock2)
 
 #### `build-mingw.bat`
-
-- Windows batch script
-- Gọi Makefile với validation
-
----
-
-### Test Data
-
-#### `data/plain.txt` (~800 bytes)
-
-- File test mẫu
-- Nội dung: Mô tả project + DES algorithm
-- Format: UTF-8 text
+- Windows batch script gọi Makefile với validation
 
 ---
 
 ## 📊 Thống Kê
 
-| Component         | File     | Lines     | Purpose               |
-| ----------------- | -------- | --------- | --------------------- |
-| **DES Logic**     | 6 files  | 1,150     | Encryption/decryption |
-| **Network**       | 2 files  | 400       | TCP communication     |
-| **Application**   | 2 files  | 350       | Client/server apps    |
-| **Build**         | 3 files  | 280       | Compilation           |
-| **Total Code**    | 13 files | **2,180** | Core logic            |
-| **Documentation** | 4 files  | -         | User guides           |
-| **Test Data**     | 1 file   | -         | Sample test file      |
+| Component | Files | Lines | Nhiệm vụ |
+|---|---|---|---|
+| **DES Algorithm** | 6 | ~650 | Mã hóa / giải mã |
+| **Network** | 2 | ~300 | TCP transport |
+| **Application** | 2 | ~550 | Client / Server |
+| **Build** | 2 | ~220 | Compilation |
+| **Tổng C++** | **12** | **~1,720** | |
+| **GUI Python** | 1 | ~910 | PyQt6 interface |
+| **Documentation** | 3 | — | Hướng dẫn |
 
 ---
 
 ## 🔗 Dependencies
 
-### Header to Implementation
-
 ```
-des_tables.h  ← des_tables.cpp
-des_core.h    ← des_core.cpp + des_tables.h
-des_utils.h   ← des_utils.cpp + des_core.h
-socket_utils.h ← socket_utils.cpp
-```
+des_tables.h  ←── des_tables.cpp
+des_core.h    ←── des_core.cpp  (uses des_tables.h)
+des_utils.h   ←── des_utils.cpp (uses des_core.h, windows.h)
+socket_utils.h ←── socket_utils.cpp (winsock2 / posix)
 
-### Application to Libraries
-
-```
-client_main.cpp  uses: des_core.h, des_utils.h, socket_utils.h
-server_main.cpp  uses: des_core.h, des_utils.h, socket_utils.h
-```
-
-### Platform Headers
-
-```
-Windows: #include <winsock2.h>
-Linux:   #include <arpa/inet.h>
+client_main.cpp  uses: des_core.h, des_utils.h, socket_utils.h, windows.h
+server_main.cpp  uses: des_core.h, des_utils.h, socket_utils.h, windows.h
 ```
 
 ---
 
-## 🎯 Mỗi File Làm Gì
+## 🖥️ GUI Files
 
-| File                 | Input           | Process      | Output           |
-| -------------------- | --------------- | ------------ | ---------------- |
-| **client_main.cpp**  | plain.txt       | Encrypt      | TCP data         |
-| **des_core.cpp**     | Plaintext block | 16 rounds    | Ciphertext block |
-| **socket_utils.cpp** | Bytes           | Send/Receive | TCP transfer     |
-| **server_main.cpp**  | TCP data        | Decrypt      | output.txt       |
+### `GUI/app_pro.py` (~910 lines)
 
----
-
-## 📝 Kích Thước File
-
-```
-Header files:     ~350 bytes total
-Source files:     ~15 KB (compiled ~2-3 MB dengan debug symbols)
-Executables:      ~2.5 MB each (client + server)
-Object files:     ~100 KB total (during build)
-Static libs:      ~100 KB total (libdes.a + libnetwork.a)
-```
+| Class | Mô tả |
+|---|---|
+| `TransferThread` | QThread chạy subprocess C++, lưu `proc` để kill khi đóng app |
+| `MultiFileDropZone` | QFrame nhận drag-and-drop nhiều file |
+| `FileListWidget` | Danh sách file gửi: hiển thị kích thước, xoá từng file |
+| `DESTransferApp` | QMainWindow chính: 2 tab Gửi/Nhận, log panel, scroll |
 
 ---
 
-**Total: 22 files, ~2,200 lines code, ~3,500 lines documentation**
+**Updated**: April 2026

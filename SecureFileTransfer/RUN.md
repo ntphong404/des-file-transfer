@@ -1,94 +1,111 @@
-# Hướng Dẫn Chạy (Windows MinGW + Make)
+# Hướng Dẫn Build & Chạy
 
-## ⚡ Cách Nhanh Nhất (3 Lệnh)
+## ⚡ Cách Nhanh Nhất
 
-### 1️⃣ Biên Dịch
+### 1️⃣ Build
 
 ```bash
-cd D:\Phong\Mon_dai_hoc\Nam_4\ki2\csat&bmtt\SecureFileTransfer
+cd SecureFileTransfer
 make clean
 make all
+# → bin/client_send.exe, bin/server_recv.exe
 ```
 
-### 2️⃣ Chạy Server (Terminal 1)
+### 2️⃣ Chạy Server (Terminal 1 — máy nhận)
 
 ```bash
-bin\server_recv.exe 5000 output.txt 12345678
+bin\server_recv.exe <port> <output_dir> <key>
+
+# Ví dụ:
+bin\server_recv.exe 5000 D:\received 12345678
 ```
 
-### 3️⃣ Chạy Client (Terminal 2)
+### 3️⃣ Chạy Client (Terminal 2 — máy gửi)
 
 ```bash
-bin\client_send.exe 127.0.0.1 5000 data\plain.txt 12345678
+bin\client_send.exe <ip> <port> <key> <file1> [file2] [file3]...
+
+# Ví dụ gửi 1 file:
+bin\client_send.exe 127.0.0.1 5000 12345678 data\plain.txt
+
+# Ví dụ gửi nhiều file:
+bin\client_send.exe 127.0.0.1 5000 12345678 report.pdf photo.jpg notes.txt
 ```
+
+> **Lưu ý:** Key chỉ dùng đúng 8 ký tự đầu (giới hạn của DES). Key giống nhau cả 2 đầu mới giải mã được.
 
 ### 4️⃣ Kiểm Tra Kết Quả
 
-```bash
-(Get-FileHash data\plain.txt).Hash -eq (Get-FileHash output.txt).Hash
+```powershell
+# PowerShell
+(Get-FileHash data\plain.txt).Hash -eq (Get-FileHash D:\received\plain.txt).Hash
+# → True = thành công
 ```
 
-✅ **Nếu kết quả True → Thành công!**
+---
+
+## 🖥️ Chạy Qua GUI (khuyến nghị)
+
+```bash
+cd GUI
+venv\Scripts\activate
+python app_pro.py
+```
+
+Hoặc double-click `GUI/run_app.vbs`.
 
 ---
 
 ## 📋 Các Lệnh Make
 
 ```bash
-make all            # Biên dịch tất cả (MẶC ĐỊNH)
+make all            # Build tất cả (mặc định)
 make clean          # Xóa bin/ + obj/
 make clean-obj      # Xóa chỉ obj/
-make run-server     # Chạy server (mặc định: 5000, password: 12345678)
-make run-client     # Chạy client (mặc định)
+make run-server     # Chạy server mặc định (port 5000, key 12345678)
+make run-client     # Chạy client mặc định
 make info           # Hiển thị compiler info
 make help           # Hiển thị tất cả targets
 ```
 
 ---
 
-## 🔧 Tùy Chỉnh
+## 🔧 Tuỳ Chỉnh
 
 ### Thay Đổi Port
 
 ```bash
-# Server
-bin\server_recv.exe 9000 output.txt mykey123
-
-# Client (match với server)
-bin\client_send.exe 127.0.0.1 9000 data\plain.txt mykey123
+bin\server_recv.exe 9000 D:\received mykey123
+bin\client_send.exe 192.168.1.5 9000 mykey123 file.txt
 ```
 
-### Thay Đổi Khóa DES
+### Gửi Nhiều File Cùng Lúc
 
 ```bash
-# Khóa phải đúng 8 ký tự, giống nhau trên client & server
-bin\server_recv.exe 5000 output.txt mykey123
-bin\client_send.exe 127.0.0.1 5000 data\plain.txt mykey123
+bin\client_send.exe 127.0.0.1 5000 12345678 file1.pdf file2.jpg file3.docx
 ```
 
-### Mã Hóa File Khác
+Server tự nhận và lưu từng file với tên gốc vào `output_dir`.
+
+### Tên File Tiếng Việt
+
+Hoàn toàn hỗ trợ — cả client và server đều dùng UTF-8 qua `GetCommandLineW()` / `_wfopen`.
 
 ```bash
-# Gửi file khác
-bin\client_send.exe 127.0.0.1 5000 data\image.jpg mykey123
-
-# Output file khác
-bin\server_recv.exe 5000 result.bin mykey123
+bin\client_send.exe 127.0.0.1 5000 12345678 "Bài tập nhóm.pdf" "Hình ảnh.png"
 ```
 
 ---
 
 ## ✅ Kiểm Tra Công Cụ
 
-Trước khi biên dịch, đảm bảo đã cài:
-
 ```bash
-gcc --version          # GCC 5.0+ required
-g++ --version          # G++ 5.0+ required
-make --version         # Make 3.8+ required
+gcc --version       # GCC 10+ required
+g++ --version
+make --version      # Make 4.0+ required
 ```
 
-Nếu thiếu:
+Nếu thiếu (Windows):
 
 ```bash
 choco install mingw make -y
@@ -98,177 +115,94 @@ choco install mingw make -y
 
 ## 📊 Output Ví Dụ
 
-### Compile
+### Server
 
 ```
-g++ -std=c++17 -Wall -Wextra -O2 -Iinclude -c src/des/des_tables.cpp -o obj/src/des/des_tables.o
-...
-ar rcs obj/libdes.a ...
-ar rcs obj/libnetwork.a ...
-g++ ... -o bin/client_send.exe
-g++ ... -o bin/server_recv.exe
-```
-
-### Server Running
-
-```
-=== DES File Reception & Decryption (Server) ===
-Listening on port: 5000
-Output file: output.txt
-Key: 12345678
+=== DES Multi-File Reception & Decryption (Server) ===
+Port      : 5000
+Output dir: D:\received
 
 [1] Creating server socket...
-    Server listening on port 5000
-
 [2] Waiting for client connection...
+[3] Expecting 3 file(s)...
+
+--- File [1/3] ---
+  Filename  : report.pdf
+  Data size : 204800 bytes (encrypted)
+  Decrypted : 204793 bytes
+  Saved to  : D:\received/report.pdf  [OK]
+
+--- File [2/3] ---
+  ...
+
+=== Result: 3/3 files received successfully ===
 ```
 
-### Client Running
+### Client
 
 ```
-=== DES File Encryption & Transmission (Client) ===
-Server: 127.0.0.1:5000
-Input file: data/plain.txt
-Key: 12345678
+=== DES Multi-File Encryption & Transmission (Client) ===
+Server : 127.0.0.1:5000
+Files  : 3
 
-[1] Reading input file...
-    Plaintext size: 856 bytes
-
-[4] Encrypting file (ECB mode)...
-    Ciphertext size: 864 bytes
-
-[5] Connecting to server...
-    Connected to server 127.0.0.1:5000
-...
-=== Transmission Complete ===
+[1/3] Reading & encrypting: report.pdf
+      204793 bytes → 204800 bytes (encrypted)
+[2/3] Reading & encrypting: photo.jpg
+      ...
+[4] Connecting to 127.0.0.1:5000...
+[5] Sending 3 file(s)...
+  [1/3] report.pdf → sent 204800 bytes  [OK]
+  [2/3] photo.jpg  → sent ...           [OK]
+  ...
+=== All 3 files sent successfully ===
 ```
 
 ---
 
 ## ❌ Lỗi Thường Gặp
 
-| Lỗi                       | Nguyên Nhân              | Cách Sửa                        |
-| ------------------------- | ------------------------ | ------------------------------- |
-| `make: command not found` | Make chưa cài            | `choco install make`            |
-| `g++: command not found`  | MinGW chưa cài           | `choco install mingw`           |
-| `Address already in use`  | Port 5000 bị chiếm       | Dùng port khác: `-p 5001`       |
-| `Cannot read input file`  | File input không tồn tại | Kiểm tra path: `data\plain.txt` |
-| `Connection refused`      | Server chưa chạy         | Chạy server trước               |
-| `Invalid key length`      | Khóa không 8 ký tự       | Khóa phải đúng 8 ký tự          |
-| `.exe not found`          | Chưa biên dịch           | Chạy `make all` trước           |
+| Lỗi | Nguyên Nhân | Cách Sửa |
+|-----|-------------|----------|
+| `make: command not found` | Make chưa cài | `choco install make` |
+| `g++: command not found` | MinGW chưa cài | `choco install mingw` |
+| `Connection refused` | Server chưa chạy | Chạy server trước client |
+| `Address already in use` | Port đang bị chiếm | Dùng port khác |
+| `Cannot open file` | File không tồn tại | Kiểm tra đường dẫn |
+| `Invalid padding` | Key khác nhau 2 đầu | Đảm bảo key giống nhau |
+| `.exe not found` | Chưa build | Chạy `make all` trước |
 
 ---
 
-## 🛠️ Build Options
+## 🔄 Kịch Bản Test
 
-### Debug Build (có symbols)
-
-Sửa Makefile:
-
-```makefile
-CXXFLAGS = -std=c++17 -Wall -Wextra -g -O0
-```
-
-Sau đó:
+### Test 1: Cùng máy — nhiều file
 
 ```bash
-make clean
-make all
+bin\server_recv.exe 5000 .\received 12345678
+bin\client_send.exe 127.0.0.1 5000 12345678 data\plain.txt data\image.jpg
 ```
 
-### Release Build Tối Ưu
-
-Sửa Makefile:
-
-```makefile
-CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -march=native
-```
-
----
-
-## 📝 Workflow Hoàn Chỉnh
-
-```
-1. Build
-   $ make clean
-   $ make all
-   ✓ bin\client_send.exe created
-   ✓ bin\server_recv.exe created
-
-2. Terminal 1 - Start Server
-   $ bin\server_recv.exe 5000 output.txt 12345678
-   ✓ Server listening on port 5000...
-
-3. Terminal 2 - Start Client
-   $ bin\client_send.exe 127.0.0.1 5000 data\plain.txt 12345678
-   ✓ Connected to server
-   ✓ Data sent
-
-4. Verify
-   $ fc data\plain.txt output.txt
-   ✓ Files match!
-
-5. Cleanup (optional)
-   $ make clean
-```
-
----
-
-## 🔄 Test với File Khác Nhau
-
-### Test 1: Same Machine, Different Ports
+### Test 2: Khác máy trong LAN
 
 ```bash
-# Terminal 1
-bin\server_recv.exe 5001 output1.txt key12345
+# Máy A (nhận) — IP: 192.168.1.10
+bin\server_recv.exe 5000 D:\received secret1234
 
-# Terminal 2
-bin\client_send.exe 127.0.0.1 5001 data\plain.txt key12345
+# Máy B (gửi)
+bin\client_send.exe 192.168.1.10 5000 secret1234 "Báo cáo.docx" "Slide.pptx"
 ```
 
-### Test 2: Different Files
+### Test 3: Kiểm tra tính toàn vẹn
 
-```bash
-# Tạo file test
-echo "Hello World!" > data\test.txt
-
-# Terminal 1
-bin\server_recv.exe 5002 output2.txt pwdpwdpw
-
-# Terminal 2
-bin\client_send.exe 127.0.0.1 5002 data\test.txt pwdpwdpw
-```
-
-### Test 3: Network (Different Machines)
-
-```bash
-# Server machine (192.168.1.100)
-bin\server_recv.exe 5000 output.txt secret123
-
-# Client machine
-bin\client_send.exe 192.168.1.100 5000 data\plain.txt secret123
+```powershell
+# So sánh hash file gốc vs file nhận
+$original = (Get-FileHash "data\plain.txt").Hash
+$received = (Get-FileHash ".\received\plain.txt").Hash
+if ($original -eq $received) { "✅ PASS" } else { "❌ FAIL" }
 ```
 
 ---
 
-## ⏱️ Thời Gian Biên Dịch
-
-```
-First build:    ~3-5 seconds (toàn bộ)
-Incremental:    <1 second (chỉ file thay đổi)
-After clean:    ~2-3 seconds
-```
-
----
-
-## 📚 Tài Liệu Thêm
-
-- **Kiến trúc**: [ARCHITECTURE.md](ARCHITECTURE.md)
-- **Danh sách file**: [FILES.md](FILES.md)
-- **Tổng quan**: [README.md](README.md)
-
----
-
-**Created**: March 28, 2026  
-**For**: Windows MinGW 15.2.0 + GNU Make 4.4.1  
+**Created**: March 2026 | **Updated**: April 2026
+**Platform**: Windows MinGW 15.2.0 + GNU Make 4.4.1
 **Status**: ✅ Ready to use
