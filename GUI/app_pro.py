@@ -543,15 +543,64 @@ class DESTransferApp(QMainWindow):
         out_group.setLayout(out_layout)
         layout.addWidget(out_group)
 
-        # Status info box
-        status_box = QGroupBox("📊  Trạng Thái")
+        # ── Panel file đã nhận ──
+        status_box = QGroupBox("📊  Kết Quả Nhận")
         sb_layout = QVBoxLayout()
         sb_layout.setContentsMargins(10, 10, 10, 10)
-        self.recv_status = QLabel("Chưa bắt đầu")
-        self.recv_status.setFont(QFont("Segoe UI", 9))
+        sb_layout.setSpacing(6)
+
+        # Status badge (1 dòng)
+        self.recv_status = QLabel("🔵 Chưa bắt đầu")
+        self.recv_status.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
         self.recv_status.setStyleSheet("color: #64748b;")
         self.recv_status.setWordWrap(True)
         sb_layout.addWidget(self.recv_status)
+
+        # Header hàng file
+        file_header = QHBoxLayout()
+        self.recv_count_label = QLabel("Danh sách file đã nhận:")
+        self.recv_count_label.setFont(QFont("Segoe UI", 8))
+        self.recv_count_label.setStyleSheet("color: #94a3b8;")
+        self.recv_clear_btn = QPushButton("🗑 Xóa")
+        self.recv_clear_btn.setFixedHeight(22)
+        self.recv_clear_btn.setFixedWidth(55)
+        self.recv_clear_btn.setFont(QFont("Segoe UI", 7))
+        self.recv_clear_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.recv_clear_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #fee2e2; color: #dc2626;
+                border: 1px solid #fca5a5; border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #fecaca; }
+        """)
+        self.recv_clear_btn.clicked.connect(self._clear_recv_list)
+        file_header.addWidget(self.recv_count_label)
+        file_header.addStretch()
+        file_header.addWidget(self.recv_clear_btn)
+        sb_layout.addLayout(file_header)
+
+        # Danh sách file nhận được
+        self.recv_file_list = QListWidget()
+        self.recv_file_list.setFixedHeight(150)
+        self.recv_file_list.setFont(QFont("Segoe UI", 9))
+        self.recv_file_list.setStyleSheet("""
+            QListWidget {
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                background-color: #f8fafc;
+                outline: none;
+            }
+            QListWidget::item {
+                padding: 5px 8px;
+                border-bottom: 1px solid #f1f5f9;
+            }
+            QListWidget::item:selected {
+                background-color: #dcfce7;
+                color: #15803d;
+            }
+        """)
+        sb_layout.addWidget(self.recv_file_list)
+
         status_box.setLayout(sb_layout)
         layout.addWidget(status_box)
 
@@ -796,28 +845,68 @@ class DESTransferApp(QMainWindow):
 
         self.recv_btn.setEnabled(False)
         self.recv_btn.setText("⏳  Đang lắng nghe...")
+
+        # Reset panel file nhận
+        self._clear_recv_list()
         self.recv_status.setText(
             f"🔵 Đang lắng nghe trên port {self.recv_port.text()}...\n"
             "Chờ client kết nối..."
         )
-        self.recv_status.setStyleSheet("color: #2563eb; font-size: 9px;")
+        self.recv_status.setStyleSheet("color: #2563eb; font-weight: bold;")
 
         self.transfer_thread = TransferThread(cmd, str(self.project_dir))
         self.transfer_thread.log_signal.connect(self._log)
+        self.transfer_thread.log_signal.connect(self._on_recv_log)   # parse file list
         self.transfer_thread.finished_signal.connect(self._on_recv_done)
         self.transfer_thread.start()
+
+    def _on_recv_log(self, msg: str, level: str):
+        """Parse log lines từ server để hiển thị danh sách file đã nhận."""
+        # Server in: "  Saved to  : /path/to/file.txt  [OK]"
+        low = msg.strip().lower()
+        if "saved to" in low and "[ok]" in low:
+            # Tách phần path giữa ":" và "[OK]"
+            try:
+                part = msg.split(":", 1)[1]          # bỏ phần "Saved to"
+                path = part.replace("[OK]", "").strip()
+                name = os.path.basename(path)
+                size_str = ""
+                if os.path.exists(path):
+                    sz = os.path.getsize(path)
+                    size_str = FileListWidget._fmt_size(sz)
+                item = QListWidgetItem(f"  ✅  {name}   {size_str}")
+                item.setToolTip(path)
+                item.setForeground(QColor("#15803d"))
+                self.recv_file_list.addItem(item)
+                self.recv_file_list.scrollToBottom()
+                n = self.recv_file_list.count()
+                self.recv_count_label.setText(
+                    f"Danh sách file đã nhận: ✔ {n} file"
+                )
+                self.recv_count_label.setStyleSheet("color: #16a34a; font-size: 8px; font-weight: bold;")
+            except Exception:
+                pass
+
+    def _clear_recv_list(self):
+        self.recv_file_list.clear()
+        self.recv_count_label.setText("Danh sách file đã nhận:")
+        self.recv_count_label.setStyleSheet("color: #94a3b8; font-size: 8px;")
+        self.recv_status.setText("🔵 Chưa bắt đầu")
+        self.recv_status.setStyleSheet("color: #64748b; font-weight: bold;")
 
     def _on_recv_done(self, success: bool):
         self.recv_btn.setEnabled(True)
         self.recv_btn.setText("▶   BẮT ĐẦU LẮNG NGHE")
         if success:
-            out = self.recv_dir.text().strip()
-            self.recv_status.setText(f"✅ Nhận thành công!\nFile lưu tại: {out}")
-            self.recv_status.setStyleSheet("color: #16a34a; font-size: 9px;")
-            self._log(f"✅ File nhận & lưu tại: {out}", "SUCCESS")
+            n = self.recv_file_list.count()
+            self.recv_status.setText(
+                f"✅ Nhận thành công {n} file!"
+            )
+            self.recv_status.setStyleSheet("color: #16a34a; font-weight: bold;")
+            self._log(f"✅ Nhận xong {n} file!", "SUCCESS")
         else:
             self.recv_status.setText("❌ Nhận file thất bại. Kiểm tra key và kết nối.")
-            self.recv_status.setStyleSheet("color: #dc2626; font-size: 9px;")
+            self.recv_status.setStyleSheet("color: #dc2626; font-weight: bold;")
             self._log("Nhận file thất bại.", "ERROR")
 
     # ── VALIDATION ────────────────────────────
