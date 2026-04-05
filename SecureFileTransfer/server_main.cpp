@@ -39,15 +39,23 @@ void printUsage(const char *programName)
     std::cout << "Note: Files are saved with their original names inside <output_dir>" << std::endl;
 }
 
-bool parseKey(const std::string &keyStr, uint8_t *key)
+// Parse key: allow 8 bytes for DES, 24 bytes for 3DES
+bool parseKey(const std::string &keyStr, uint8_t *key, bool &is3DES)
 {
-    if (keyStr.length() < 8)
+    if (keyStr.length() >= 24)
     {
-        std::cerr << "Error: Key must be at least 8 characters" << std::endl;
-        return false;
+        std::memcpy(key, keyStr.c_str(), 24);
+        is3DES = true;
+        return true;
     }
-    std::memcpy(key, keyStr.c_str(), KEY_SIZE);
-    return true;
+    else if (keyStr.length() >= 8)
+    {
+        std::memcpy(key, keyStr.c_str(), 8);
+        is3DES = false;
+        return true;
+    }
+    std::cerr << "Error: Key must be at least 8 characters (or 24 for 3DES)" << std::endl;
+    return false;
 }
 
 // Receive uint32_t big-endian (4 bytes)
@@ -162,12 +170,14 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    uint8_t desKey[KEY_SIZE];
-    if (!parseKey(keyStr, desKey))
+    uint8_t desKey[24];
+    bool is3DES = false;
+    if (!parseKey(keyStr, desKey, is3DES))
         return 1;
 
-    std::cout << "=== DES Multi-File Reception & Decryption (Server) ===" << std::endl;
+    std::cout << "=== " << (is3DES ? "3DES" : "DES") << " Multi-File Reception & Decryption (Server) ===" << std::endl;
     std::cout << "Port      : " << port << std::endl;
+    std::cout << "Mode      : " << (is3DES ? "3DES (24-byte key) EDE3" : "DES (8-byte key)") << std::endl;
     std::cout << "Output dir: " << outputDir << std::endl;
 
     if (!initializeSocketLibrary())
@@ -200,8 +210,14 @@ int main(int argc, char *argv[])
     }
 
     // Generate round keys
-    RoundKeys roundKeys;
-    generateRoundKeys(desKey, roundKeys);
+    RoundKeys rk1, rk2, rk3;
+    if (is3DES) {
+        generateRoundKeys(desKey, rk1);
+        generateRoundKeys(desKey + 8, rk2);
+        generateRoundKeys(desKey + 16, rk3);
+    } else {
+        generateRoundKeys(desKey, rk1);
+    }
 
     // ----- Receive number of files -----
     uint32_t numFiles = 0;
@@ -271,7 +287,11 @@ int main(int argc, char *argv[])
         for (size_t j = 0; j < ciphertext.size(); j += BLOCK_SIZE)
         {
             uint8_t block[BLOCK_SIZE];
-            decryptBlock(ciphertext.data() + j, block, roundKeys);
+            if (is3DES) {
+                decryptBlock3DES(ciphertext.data() + j, block, rk1, rk2, rk3);
+            } else {
+                decryptBlock(ciphertext.data() + j, block, rk1);
+            }
             decrypted.insert(decrypted.end(), block, block + BLOCK_SIZE);
         }
 

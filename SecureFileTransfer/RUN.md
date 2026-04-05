@@ -32,7 +32,7 @@ bin\client_send.exe 127.0.0.1 5000 12345678 data\plain.txt
 bin\client_send.exe 127.0.0.1 5000 12345678 report.pdf photo.jpg notes.txt
 ```
 
-> **Lưu ý:** Key chỉ dùng đúng 8 ký tự đầu (giới hạn của DES). Key giống nhau cả 2 đầu mới giải mã được.
+> **Lưu ý**: Dùng Key >= 24 ký tự để tự động bật chế độ **3DES** (Triple DES). Dưới 24 ký tự sẽ dùng **DES** (8 byte đầu). Key giống nhau cả 2 đầu mới giải mã được.
 
 ### 4️⃣ Kiểm Tra Kết Quả
 
@@ -86,6 +86,18 @@ bin\client_send.exe 127.0.0.1 5000 12345678 file1.pdf file2.jpg file3.docx
 ```
 
 Server tự nhận và lưu từng file với tên gốc vào `output_dir`.
+
+### Gửi và Nhận Bằng 3DES (Chế Độ Bảo Mật Cao)
+
+Cơ chế: Nếu Key bạn truyền vào độ dài **>= 24 ký tự**, hệ thống C++ sẽ tự động nhận diện và sử dụng thuật toán **3DES** thay vì DES.
+
+```bash
+# Server lắng nghe bằng 3DES
+bin\server_recv.exe 5000 D:\received 1234567887654321abcdefgh
+
+# Client gửi bằng 3DES
+bin\client_send.exe 127.0.0.1 5000 1234567887654321abcdefgh important.pdf
+```
 
 ### Tên File Tiếng Việt
 
@@ -141,8 +153,9 @@ Output dir: D:\received
 ### Client
 
 ```
-=== DES Multi-File Encryption & Transmission (Client) ===
+=== 3DES Multi-File Encryption & Transmission (Client) ===
 Server : 127.0.0.1:5000
+Mode   : 3DES (24-byte key) EDE3
 Files  : 3
 
 [1/3] Reading & encrypting: report.pdf
@@ -168,7 +181,7 @@ Files  : 3
 | `Connection refused` | Server chưa chạy | Chạy server trước client |
 | `Address already in use` | Port đang bị chiếm | Dùng port khác |
 | `Cannot open file` | File không tồn tại | Kiểm tra đường dẫn |
-| `Invalid padding` | Key khác nhau 2 đầu | Đảm bảo key giống nhau |
+| `Invalid padding` | Chết Padding do lệch Key / lệch thuật toán (DES vs 3DES) | Đảm bảo Key và độ dài Key (chuẩn DES/3DES) giống nhau |
 | `.exe not found` | Chưa build | Chạy `make all` trước |
 
 ---
@@ -203,6 +216,6 @@ if ($original -eq $received) { "✅ PASS" } else { "❌ FAIL" }
 
 ---
 
-**Created**: March 2026 | **Updated**: April 2026
+**Created**: March 2026 | **Updated**: April 2026 (Added 3DES)
 **Platform**: Windows MinGW 15.2.0 + GNU Make 4.4.1
-**Status**: ✅ Ready to use
+**Status**: ✅ Ready to use (DES + 3DES Supported)

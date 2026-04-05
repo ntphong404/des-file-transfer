@@ -13,7 +13,7 @@
 
 ## ✨ Tính năng
 
-- **Mã hóa DES**: Thuật toán DES 16 vòng, key 56-bit hiệu dụng, khối 64-bit, PKCS#7 padding
+- **Mã hóa DES / 3DES**: Hỗ trợ thuật toán DES thuần (8-byte key) và chế độ bảo mật cao 3DES EDE3 (Triple DES, 24-byte key)
 - **Gửi nhiều file một lúc**: Protocol mới hỗ trợ batch transfer N file trong 1 kết nối
 - **Tên file tự động**: Server tự lưu đúng tên file gốc (kể cả tên tiếng Việt)
 - **GUI hiện đại**: Giao diện PyQt6 với drag-and-drop nhiều file, danh sách file nhận real-time
@@ -108,7 +108,7 @@ pip install PyQt6
 ### Tab Gửi File
 
 1. Mở app → chọn tab **"📤 Gửi File"**
-2. Nhập **IP Server** (máy nhận), **Port** (ví dụ: `5000`), **Key** (≥8 ký tự)
+2. Nhập **IP Server** (máy nhận), **Port** (ví dụ: `5000`), **Key** (≥8 ký tự). Có thể tích chọn **Dùng thuật toán 3DES** (tự động mở thêm 2 trường Key).
 3. Kéo thả nhiều file vào Drop Zone **hoặc** nhấn "Chọn File..."
 4. Xem danh sách file muốn gửi (có thể xoá từng file)
 5. Nhấn **"▶ GỬI FILE"**
@@ -132,6 +132,9 @@ bin\server_recv.exe 5000 D:\received 12345678
 # Máy gửi
 bin\client_send.exe <ip> <port> <key> <file1> [file2] [file3]...
 bin\client_send.exe 192.168.1.100 5000 12345678 report.pdf photo.jpg
+
+# Sử dụng 3DES (Chỉ cần truyền key >24 ký tự)
+bin\client_send.exe 127.0.0.1 5000 1234567887654321abcdefgh report.pdf
 ```
 
 ## 🏗️ Kiến trúc hệ thống
@@ -148,8 +151,8 @@ Với mỗi file:
 ### DES Encryption
 
 - **Mode**: ECB (Electronic Codebook)
-- **Feistel Network**: 16 vòng
-- **Key Schedule**: Sinh 16 round key từ 56-bit key (8 bytes)
+- **Feistel Network**: DES chuẩn 16 vòng. Với 3DES: 48 vòng (Encrypt -> Decrypt -> Encrypt).
+- **Key Schedule**: Sinh 16 round key từ 1 key 8-byte (DES), sinh 48 round key từ cụm 24-byte key (3DES).
 - **S-boxes**: Bảng thay thế FIPS 46-3
 - **Padding**: PKCS#7 (1–8 bytes)
 
@@ -173,9 +176,9 @@ QMainWindow
 
 | Thành phần | Chi tiết |
 |---|---|
-| Thuật toán | DES (FIPS 46-3) |
+| Thuật toán | DES / 3DES (Triple DES - EDE3) |
 | Mode | ECB — phù hợp học tập |
-| Key | 8 bytes (56 bits hiệu dụng) |
+| Key | 8 bytes (DES) hoặc 24 bytes (3DES) |
 | Padding | PKCS#7 được validate khi giải mã |
 | Transport | TCP plaintext (không có TLS) |
 

@@ -58,6 +58,18 @@ namespace DES
      */
     void decryptBlock(const uint8_t *ciphertext, uint8_t *plaintext, const RoundKeys &roundKeys);
 
+    /*
+     * 3DES Encrypt a single 64-bit block (EDE3 mode)
+     */
+    void encryptBlock3DES(const uint8_t *plaintext, uint8_t *ciphertext, 
+                          const RoundKeys &rk1, const RoundKeys &rk2, const RoundKeys &rk3);
+
+    /*
+     * 3DES Decrypt a single 64-bit block (EDE3 mode)
+     */
+    void decryptBlock3DES(const uint8_t *ciphertext, uint8_t *plaintext, 
+                          const RoundKeys &rk1, const RoundKeys &rk2, const RoundKeys &rk3);
+
 } // namespace DES
 
 #endif // DES_CORE_H

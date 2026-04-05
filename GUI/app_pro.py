@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QTabWidget, QTextEdit,
     QFileDialog, QGroupBox, QFormLayout, QFrame, QListWidget,
     QListWidgetItem, QAbstractItemView, QSizePolicy, QSpacerItem,
-    QScrollArea
+    QScrollArea, QCheckBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QUrl, QMimeData
 from PyQt6.QtGui import (QFont, QColor, QTextCursor, QIcon,
@@ -54,11 +54,19 @@ class TransferThread(QThread):
             for line in self.proc.stdout:
                 line = line.rstrip()
                 if line:
-                    level = "ERROR" if any(k in line.lower() for k in ("error", "fail", "invalid")) else "INFO"
-                    if "ok" in line.lower() or "success" in line.lower() or "[OK]" in line:
+                    lower_line = line.lower()
+                    # Tránh bắt nhầm chữ "error" trong đường dẫn (VD: thư mục "test/error")
+                    is_err = any(k in lower_line for k in ("error:", " error ", "failed ", "invalid "))
+                    
+                    if is_err:
+                        level = "ERROR"
+                    elif "ok" in lower_line or "success" in lower_line or "[OK]" in line:
                         level = "SUCCESS"
-                    if "warning" in line.lower():
+                    elif "warning" in lower_line:
                         level = "WARNING"
+                    else:
+                        level = "INFO"
+                        
                     self.log_signal.emit(line, level)
 
             self.proc.wait()
@@ -449,15 +457,39 @@ class DESTransferApp(QMainWindow):
 
         self.send_ip   = QLineEdit("127.0.0.1")
         self.send_port = QLineEdit("5000")
-        self.send_key  = QLineEdit("12345678")
-        self.send_key.setEchoMode(QLineEdit.EchoMode.Password)
+        
+        self.send_key1 = QLineEdit("12345678")
+        
+        # 3DES Toggle (below Key 1)
+        self.send_3des_cb = QCheckBox(" 🛡️ Dùng thuật toán 3DES (Bảo mật cao)")
+        self.send_3des_cb.setToolTip("Sử dụng 3 vòng DES với 3 khóa độc lập (chậm hơn nhưng an toàn hơn).")
+        self.send_3des_cb.stateChanged.connect(self._toggle_send_3des)
 
-        for w_ in (self.send_ip, self.send_port, self.send_key):
+        self.send_key2 = QLineEdit("87654321")
+        self.send_key3 = QLineEdit("abcdefgh")
+        
+        for key_input in (self.send_key1, self.send_key2, self.send_key3):
+            key_input.setEchoMode(QLineEdit.EchoMode.Password)
+            key_input.setFixedHeight(32)
+
+        for w_ in (self.send_ip, self.send_port):
             w_.setFixedHeight(32)
 
         cfg_layout.addRow("IP Server:", self.send_ip)
         cfg_layout.addRow("Port:", self.send_port)
-        cfg_layout.addRow("Key (mật khẩu):", self.send_key)
+        
+        self.send_lbl_key1 = QLabel("Key (mật khẩu):")
+        cfg_layout.addRow(self.send_lbl_key1, self.send_key1)
+        
+        cfg_layout.addRow(self.send_3des_cb)
+        
+        self.send_lbl_key2 = QLabel("Key 2:")
+        self.send_lbl_key3 = QLabel("Key 3:")
+        cfg_layout.addRow(self.send_lbl_key2, self.send_key2)
+        cfg_layout.addRow(self.send_lbl_key3, self.send_key3)
+        
+        self._toggle_send_3des() # Set initial visibility
+
         cfg.setLayout(cfg_layout)
         layout.addWidget(cfg)
 
@@ -488,6 +520,14 @@ class DESTransferApp(QMainWindow):
 
         return w
 
+    def _toggle_send_3des(self):
+        is_3des = self.send_3des_cb.isChecked()
+        self.send_lbl_key2.setVisible(is_3des)
+        self.send_key2.setVisible(is_3des)
+        self.send_lbl_key3.setVisible(is_3des)
+        self.send_key3.setVisible(is_3des)
+        self.send_lbl_key1.setText("Key 1:" if is_3des else "Key (mật khẩu):")
+
     # ── RECEIVE TAB ──────────────────────────
     def _make_receive_tab(self) -> QWidget:
         w = QWidget()
@@ -503,14 +543,37 @@ class DESTransferApp(QMainWindow):
         cfg_layout.setHorizontalSpacing(14)
 
         self.recv_port = QLineEdit("5000")
-        self.recv_key  = QLineEdit("12345678")
-        self.recv_key.setEchoMode(QLineEdit.EchoMode.Password)
+        
+        self.recv_key1 = QLineEdit("12345678")
+        
+        # 3DES Toggle
+        self.recv_3des_cb = QCheckBox(" 🛡️ Dùng thuật toán 3DES (Bảo mật cao)")
+        self.recv_3des_cb.setToolTip("Sử dụng 3 vòng DES với 3 khóa độc lập (chậm hơn nhưng an toàn hơn).")
+        self.recv_3des_cb.stateChanged.connect(self._toggle_recv_3des)
 
-        for w_ in (self.recv_port, self.recv_key):
-            w_.setFixedHeight(32)
+        self.recv_key2 = QLineEdit("87654321")
+        self.recv_key3 = QLineEdit("abcdefgh")
+        
+        for key_input in (self.recv_key1, self.recv_key2, self.recv_key3):
+            key_input.setEchoMode(QLineEdit.EchoMode.Password)
+            key_input.setFixedHeight(32)
+
+        self.recv_port.setFixedHeight(32)
 
         cfg_layout.addRow("Port lắng nghe:", self.recv_port)
-        cfg_layout.addRow("Key (mật khẩu):", self.recv_key)
+
+        self.recv_lbl_key1 = QLabel("Key (mật khẩu):")
+        cfg_layout.addRow(self.recv_lbl_key1, self.recv_key1)
+        
+        cfg_layout.addRow(self.recv_3des_cb)
+
+        self.recv_lbl_key2 = QLabel("Key 2:")
+        self.recv_lbl_key3 = QLabel("Key 3:")
+        cfg_layout.addRow(self.recv_lbl_key2, self.recv_key2)
+        cfg_layout.addRow(self.recv_lbl_key3, self.recv_key3)
+        
+        self._toggle_recv_3des() # Set initial visibility
+
         cfg.setLayout(cfg_layout)
         layout.addWidget(cfg)
 
@@ -616,6 +679,14 @@ class DESTransferApp(QMainWindow):
 
         return w
 
+    def _toggle_recv_3des(self):
+        is_3des = self.recv_3des_cb.isChecked()
+        self.recv_lbl_key2.setVisible(is_3des)
+        self.recv_key2.setVisible(is_3des)
+        self.recv_lbl_key3.setVisible(is_3des)
+        self.recv_key3.setVisible(is_3des)
+        self.recv_lbl_key1.setText("Key 1:" if is_3des else "Key (mật khẩu):")
+
     # ── LOG PANEL ────────────────────────────
     def _make_log_panel(self) -> QGroupBox:
         box = QGroupBox("📋  Nhật Ký Hoạt Động")
@@ -661,6 +732,23 @@ class DESTransferApp(QMainWindow):
     def _apply_global_styles(self):
         self.setStyleSheet("""
             QMainWindow { background-color: #f1f5f9; }
+            
+            QToolTip {
+                background-color: #1e293b;
+                color: #f8fafc;
+                border: 1px solid #cbd5e1;
+                border-radius: 4px;
+                padding: 4px;
+                font-family: 'Segoe UI';
+                font-size: 10px;
+            }
+            
+            QCheckBox {
+                font-family: 'Segoe UI';
+                font-size: 10px;
+                font-weight: bold;
+                color: #1e40af;
+            }
 
             QTabWidget::pane {
                 border: 1px solid #e2e8f0;
@@ -790,13 +878,19 @@ class DESTransferApp(QMainWindow):
             return
 
         files = self.file_list.files
-        key8  = self.send_key.text()[:8]   # only first 8 chars
+        
+        if self.send_3des_cb.isChecked():
+            key_str = (self.send_key1.text()[:8].ljust(8, 'X') + 
+                       self.send_key2.text()[:8].ljust(8, 'X') + 
+                       self.send_key3.text()[:8].ljust(8, 'X'))
+        else:
+            key_str = self.send_key1.text()[:8].ljust(8, 'X')
 
         cmd = [
             str(exe),
             self.send_ip.text().strip(),
             self.send_port.text().strip(),
-            key8,
+            key_str,
             *files
         ]
 
@@ -835,10 +929,16 @@ class DESTransferApp(QMainWindow):
             self._log(f"Không tìm thấy: {exe}", "ERROR")
             return
 
-        key8    = self.recv_key.text()[:8]
+        if self.recv_3des_cb.isChecked():
+            key_str = (self.recv_key1.text()[:8].ljust(8, 'X') + 
+                       self.recv_key2.text()[:8].ljust(8, 'X') + 
+                       self.recv_key3.text()[:8].ljust(8, 'X'))
+        else:
+            key_str = self.recv_key1.text()[:8].ljust(8, 'X')
+            
         out_dir = self.recv_dir.text().strip()
 
-        cmd = [str(exe), self.recv_port.text().strip(), out_dir, key8]
+        cmd = [str(exe), self.recv_port.text().strip(), out_dir, key_str]
 
         self._log("=" * 55, "INFO")
         self._log(f"Lắng nghe trên port {self.recv_port.text()}...", "INFO")
@@ -923,9 +1023,14 @@ class DESTransferApp(QMainWindow):
             self._log("IP Server không được để trống", "ERROR")
             return False
 
-        if len(self.send_key.text()) < 8:
-            self._log("Key phải có ít nhất 8 ký tự", "ERROR")
-            return False
+        if self.send_3des_cb.isChecked():
+            if len(self.send_key1.text()) < 8 or len(self.send_key2.text()) < 8 or len(self.send_key3.text()) < 8:
+                self._log("Cả 3 khóa phải có ít nhất 8 ký tự cho 3DES", "ERROR")
+                return False
+        else:
+            if len(self.send_key1.text()) < 8:
+                self._log("Key phải có ít nhất 8 ký tự", "ERROR")
+                return False
 
         if self.file_list.count == 0:
             self._log("Chưa chọn file nào để gửi!", "ERROR")
@@ -947,10 +1052,14 @@ class DESTransferApp(QMainWindow):
             self._log("Port không hợp lệ (1–65535)", "ERROR")
             return False
 
-        if len(self.recv_key.text()) < 8:
-            self._log("Key phải có ít nhất 8 ký tự", "ERROR")
-            return False
-
+        if self.recv_3des_cb.isChecked():
+            if len(self.recv_key1.text()) < 8 or len(self.recv_key2.text()) < 8 or len(self.recv_key3.text()) < 8:
+                self._log("Cả 3 khóa phải có ít nhất 8 ký tự cho 3DES", "ERROR")
+                return False
+        else:
+            if len(self.recv_key1.text()) < 8:
+                self._log("Key phải có ít nhất 8 ký tự", "ERROR")
+                return False
         d = self.recv_dir.text().strip()
         if not d:
             self._log("Cần nhập thư mục lưu file", "ERROR")

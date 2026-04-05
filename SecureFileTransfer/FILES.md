@@ -55,7 +55,7 @@ SecureFileTransfer/
 
 #### `include/des/des_core.h`
 - Khai báo hàm mã hóa cốt lõi
-- Export: `generateRoundKeys`, `encryptBlock`, `decryptBlock`, `desF`
+- Export: `generateRoundKeys`, `encryptBlock`, `decryptBlock`, `encryptBlock3DES`, `decryptBlock3DES`, `desF`
 - Type: `RoundKeys` (16 subkeys × 6 bytes)
 
 #### `include/des/des_utils.h`
@@ -75,11 +75,12 @@ SecureFileTransfer/
 - Định nghĩa tất cả bảng DES theo chuẩn FIPS 46-3
 - IP, IP_INV, E (expansion), S_BOX[8], P, PC1, PC2, LEFT_SHIFTS
 
-#### `src/des/des_core.cpp` (~250 lines)
-- Thuật toán DES 16-round Feistel Network
+#### `src/des/des_core.cpp` (~270 lines)
+- Thuật toán DES 16-round Feistel Network và 3DES (Triple DES EDE3)
 - `generateRoundKeys()` — Sinh 16 subkey từ 8-byte master key
 - `desF()` — Hàm F: Expansion → XOR → S-box → Permutation
-- `encryptBlock()` / `decryptBlock()` — Xử lý 1 block 64-bit
+- `encryptBlock()` / `decryptBlock()` — Xử lý 1 block 64-bit bằng DES
+- `encryptBlock3DES()` / `decryptBlock3DES()` — Xử lý block 64-bit bằng 3DES
 
 #### `src/des/des_utils.cpp` (~220 lines)
 - PKCS#7 padding / unpadding với validation
@@ -156,10 +157,10 @@ server_recv.exe <port> <output_dir> <key>
 |---|---|---|---|
 | **DES Algorithm** | 6 | ~650 | Mã hóa / giải mã |
 | **Network** | 2 | ~300 | TCP transport |
-| **Application** | 2 | ~550 | Client / Server |
+| **Application** | 2 | ~550 | Client / Server (DES & 3DES) |
 | **Build** | 2 | ~220 | Compilation |
-| **Tổng C++** | **12** | **~1,720** | |
-| **GUI Python** | 1 | ~910 | PyQt6 interface |
+| **Tổng C++** | **12** | **~1,740** | |
+| **GUI Python** | 1 | ~1000 | PyQt6 interface |
 | **Documentation** | 3 | — | Hướng dẫn |
 
 ---

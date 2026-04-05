@@ -244,4 +244,24 @@ namespace DES
         permute(combined, plaintext, (int *)IP_INV, 64, 64);
     }
 
+    // 3DES Encrypt
+    void encryptBlock3DES(const uint8_t *plaintext, uint8_t *ciphertext, 
+                          const RoundKeys &rk1, const RoundKeys &rk2, const RoundKeys &rk3)
+    {
+        uint8_t temp1[8], temp2[8];
+        encryptBlock(plaintext, temp1, rk1);
+        decryptBlock(temp1, temp2, rk2);
+        encryptBlock(temp2, ciphertext, rk3);
+    }
+
+    // 3DES Decrypt
+    void decryptBlock3DES(const uint8_t *ciphertext, uint8_t *plaintext, 
+                          const RoundKeys &rk1, const RoundKeys &rk2, const RoundKeys &rk3)
+    {
+        uint8_t temp1[8], temp2[8];
+        decryptBlock(ciphertext, temp1, rk3);
+        encryptBlock(temp1, temp2, rk2);
+        decryptBlock(temp2, plaintext, rk1);
+    }
+
 } // namespace DES

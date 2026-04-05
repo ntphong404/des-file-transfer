@@ -42,8 +42,8 @@
 
 - **des_core.h/cpp**: Mã hóa/giải mã 64-bit block
   - `generateRoundKeys()`: Sinh subkey từ master key
-  - `encryptBlock()`: Mã hóa 1 block
-  - `decryptBlock()`: Giải mã 1 block
+  - `encryptBlock()` / `encryptBlock3DES()`: Mã hóa 1 block (DES / 3DES)
+  - `decryptBlock()` / `decryptBlock3DES()`: Giải mã 1 block (DES / 3DES)
 - **des_utils.h/cpp**: Xử lý file toàn bộ
   - `padData()`: Thêm PKCS#7 padding
   - `unpadData()`: Bỏ padding
@@ -87,7 +87,7 @@ Danh sách N file inputs
       │
       ▼ Với mỗi 8-byte block:
 ┌─────────────────────┐
-│ encryptBlock (DES)  │  IP → 16 Feistel rounds → FP
+│ encryptBlock (DES)  │  Hoặc encryptBlock3DES (EDE3) nếu Key >= 24 bytes
 │ × (size/8) lần      │
 └─────────────────────┘
       │ ciphertext vector
@@ -122,7 +122,7 @@ Danh sách N file inputs
       │ ciphertext + filename
       ▼ Với mỗi 8-byte block:
 ┌─────────────────────┐
-│ decryptBlock (DES)  │  IP → 16 Feistel rounds (reverse) → FP
+│ decryptBlock (DES)  │  Hoặc decryptBlock3DES nếu dùng 3DES
 │ × (size/8) lần      │
 └─────────────────────┘
       │ padded plaintext
@@ -174,6 +174,12 @@ R16 || L16 (swap final round!)
       │
 Ciphertext (64-bit)
 ```
+
+### 3DES (Triple DES - EDE3 Mode)
+
+Với 3DES, quy trình thực hiện liên tiếp 3 lần DES với 3 khóa độc lập (K1, K2, K3):
+- **Encrypt**: `Ciphertext = E(K3, D(K2, E(K1, Plaintext)))`
+- **Decrypt**: `Plaintext = D(K1, E(K2, D(K3, Ciphertext)))`
 
 ### Key Schedule
 
@@ -373,7 +379,7 @@ START
 ├─────────────────────────────────────┤
 │                                     │
 │ Validation Layer:                   │
-│ ├─ Check key length (must be 8)    │
+│ ├─ Check key length (8 or 24 bytes) │
 │ ├─ Check port range (1-65535)      │
 │ └─ Check file existence             │
 │                                     │
@@ -403,7 +409,7 @@ START
 PROJECT: **DES Encryption with Network Transfer**
 
 - **Type**: Cryptographic System + Network Application
-- **Language**: C++17
+- **Language**: C++11/17
 - **Architecture**: Layered (App → Crypto → Network)
 - **Platform**: Cross-platform (Windows/Linux/macOS)
-- **Educational Purpose**: Demonstrate DES + socket programming
+- **Educational Purpose**: Demonstrate DES, 3DES, and TCP socket programming
