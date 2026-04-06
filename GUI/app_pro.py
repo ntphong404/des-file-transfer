@@ -1024,12 +1024,12 @@ class DESTransferApp(QMainWindow):
             return False
 
         if self.send_3des_cb.isChecked():
-            if len(self.send_key1.text()) < 8 or len(self.send_key2.text()) < 8 or len(self.send_key3.text()) < 8:
-                self._log("Cả 3 khóa phải có ít nhất 8 ký tự cho 3DES", "ERROR")
+            if len(self.send_key1.text()) != 8 or len(self.send_key2.text()) != 8 or len(self.send_key3.text()) != 8:
+                self._log("Cả 3 ô Key cho 3DES phải NHẬP ĐÚNG 8 ký tự mỗi ô!", "ERROR")
                 return False
         else:
-            if len(self.send_key1.text()) < 8:
-                self._log("Key phải có ít nhất 8 ký tự", "ERROR")
+            if len(self.send_key1.text()) != 8:
+                self._log("Key cho DES phải NHẬP ĐÚNG 8 ký tự!", "ERROR")
                 return False
 
         if self.file_list.count == 0:
@@ -1053,12 +1053,12 @@ class DESTransferApp(QMainWindow):
             return False
 
         if self.recv_3des_cb.isChecked():
-            if len(self.recv_key1.text()) < 8 or len(self.recv_key2.text()) < 8 or len(self.recv_key3.text()) < 8:
-                self._log("Cả 3 khóa phải có ít nhất 8 ký tự cho 3DES", "ERROR")
+            if len(self.recv_key1.text()) != 8 or len(self.recv_key2.text()) != 8 or len(self.recv_key3.text()) != 8:
+                self._log("Cả 3 ô Key cho 3DES phải NHẬP ĐÚNG 8 ký tự mỗi ô!", "ERROR")
                 return False
         else:
-            if len(self.recv_key1.text()) < 8:
-                self._log("Key phải có ít nhất 8 ký tự", "ERROR")
+            if len(self.recv_key1.text()) != 8:
+                self._log("Key cho DES phải NHẬP ĐÚNG 8 ký tự!", "ERROR")
                 return False
         d = self.recv_dir.text().strip()
         if not d:
