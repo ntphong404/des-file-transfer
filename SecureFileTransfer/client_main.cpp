@@ -20,14 +20,11 @@
 #include <fstream>
 #include <vector>
 #include <string>
-#ifdef _WIN32
 #include <windows.h>
-#endif
 
 using namespace DES;
 using namespace Network;
 
-#ifdef _WIN32
 // Windows argv[] dùng ANSI codepage, không phải UTF-8.
 // Hàm này lấy args đúng từ GetCommandLineW() → UTF-8.
 static std::vector<std::string> getUtf8Args()
@@ -45,7 +42,6 @@ static std::vector<std::string> getUtf8Args()
     LocalFree(wargv);
     return args;
 }
-#endif
 
 void printUsage(const char *programName)
 {
@@ -113,7 +109,6 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-#ifdef _WIN32
     // Lấy args tình UTF-8 để hỗ trợ tên file tiếng Việt
     auto args = getUtf8Args();
     std::string serverIP = args[1];
@@ -122,14 +117,6 @@ int main(int argc, char *argv[])
     std::vector<std::string> inputFiles;
     for (size_t i = 4; i < args.size(); i++)
         inputFiles.push_back(args[i]);
-#else
-    std::string serverIP = argv[1];
-    int port = std::atoi(argv[2]);
-    std::string keyStr = argv[3];
-    std::vector<std::string> inputFiles;
-    for (int i = 4; i < argc; i++)
-        inputFiles.push_back(argv[i]);
-#endif
 
 
     // Validate

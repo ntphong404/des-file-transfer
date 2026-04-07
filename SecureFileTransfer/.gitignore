@@ -30,6 +30,7 @@ output.txt
 received.txt
 decrypted.txt
 encrypted.bin
+received
 
 # System files
 .DS_Store

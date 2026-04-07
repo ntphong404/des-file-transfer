@@ -11,19 +11,11 @@
 #include <fstream>
 #include <vector>
 
-#ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "Mswsock.lib")
 #pragma comment(lib, "AdvApi32.lib")
-#else
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <errno.h>
-#endif
 
 namespace Network
 {
@@ -33,7 +25,6 @@ namespace Network
     // Initialize socket library
     bool initializeSocketLibrary()
     {
-#ifdef _WIN32
         WSADATA wsaData;
         int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
         if (result != 0)
@@ -43,22 +34,16 @@ namespace Network
         }
         socketLibraryInitialized = true;
         return true;
-#else
-        socketLibraryInitialized = true;
-        return true;
-#endif
     }
 
     // Cleanup socket library
     void cleanupSocketLibrary()
     {
-#ifdef _WIN32
         if (socketLibraryInitialized)
         {
             WSACleanup();
             socketLibraryInitialized = false;
         }
-#endif
     }
 
     // Create server socket
@@ -69,7 +54,6 @@ namespace Network
         serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
         serverAddr.sin_port = htons(port);
 
-#ifdef _WIN32
         SocketHandle serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (serverSocket == INVALID_SOCKET)
         {
@@ -102,44 +86,11 @@ namespace Network
 
         std::cout << "Server listening on port " << port << std::endl;
         return serverSocket;
-#else
-        SocketHandle serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-        if (serverSocket < 0)
-        {
-            std::cerr << "Socket creation error" << std::endl;
-            return INVALID_SOCKET;
-        }
-
-        if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&1, sizeof(int)) < 0)
-        {
-            std::cerr << "setsockopt error" << std::endl;
-            close(serverSocket);
-            return INVALID_SOCKET;
-        }
-
-        if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
-        {
-            std::cerr << "Bind error" << std::endl;
-            close(serverSocket);
-            return INVALID_SOCKET;
-        }
-
-        if (listen(serverSocket, MAX_PENDING_CONNECTIONS) < 0)
-        {
-            std::cerr << "Listen error" << std::endl;
-            close(serverSocket);
-            return INVALID_SOCKET;
-        }
-
-        std::cout << "Server listening on port " << port << std::endl;
-        return serverSocket;
-#endif
     }
 
     // Accept connection
     SocketHandle acceptConnection(SocketHandle serverSocket)
     {
-#ifdef _WIN32
         struct sockaddr_in clientAddr;
         int clientAddrLen = sizeof(clientAddr);
         SocketHandle clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &clientAddrLen);
@@ -153,27 +104,11 @@ namespace Network
         inet_ntop(AF_INET, &clientAddr.sin_addr, clientIP, INET_ADDRSTRLEN);
         std::cout << "Client connected from " << clientIP << ":" << ntohs(clientAddr.sin_port) << std::endl;
         return clientSocket;
-#else
-        struct sockaddr_in clientAddr;
-        socklen_t clientAddrLen = sizeof(clientAddr);
-        SocketHandle clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &clientAddrLen);
-        if (clientSocket < 0)
-        {
-            std::cerr << "Accept error" << std::endl;
-            return INVALID_SOCKET;
-        }
-
-        char clientIP[INET_ADDRSTRLEN];
-        inet_ntop(AF_INET, &clientAddr.sin_addr, clientIP, INET_ADDRSTRLEN);
-        std::cout << "Client connected from " << clientIP << ":" << ntohs(clientAddr.sin_port) << std::endl;
-        return clientSocket;
-#endif
     }
 
     // Connect to server
     SocketHandle connectToServer(const std::string &serverIP, uint16_t port)
     {
-#ifdef _WIN32
         SocketHandle clientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (clientSocket == INVALID_SOCKET)
         {
@@ -195,29 +130,6 @@ namespace Network
 
         std::cout << "Connected to server " << serverIP << ":" << port << std::endl;
         return clientSocket;
-#else
-        SocketHandle clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-        if (clientSocket < 0)
-        {
-            std::cerr << "Socket creation error" << std::endl;
-            return INVALID_SOCKET;
-        }
-
-        struct sockaddr_in serverAddr;
-        serverAddr.sin_family = AF_INET;
-        serverAddr.sin_port = htons(port);
-        inet_pton(AF_INET, serverIP.c_str(), &serverAddr.sin_addr);
-
-        if (connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
-        {
-            std::cerr << "Connection failed" << std::endl;
-            close(clientSocket);
-            return INVALID_SOCKET;
-        }
-
-        std::cout << "Connected to server " << serverIP << ":" << port << std::endl;
-        return clientSocket;
-#endif
     }
 
     // Send data
@@ -227,21 +139,12 @@ namespace Network
         while (sent < length)
         {
             int toSend = (int)std::min(BUFFER_SIZE, length - sent);
-#ifdef _WIN32
             int result = send(sock, (const char *)(buffer + sent), toSend, 0);
             if (result == SOCKET_ERROR)
             {
                 std::cerr << "Send failed with error code: " << WSAGetLastError() << std::endl;
                 return false;
             }
-#else
-            int result = send(sock, buffer + sent, toSend, 0);
-            if (result < 0)
-            {
-                std::cerr << "Send error: " << strerror(errno) << std::endl;
-                return false;
-            }
-#endif
             sent += result;
         }
         return true;
@@ -251,21 +154,12 @@ namespace Network
     int receiveData(SocketHandle sock, std::vector<uint8_t> &buffer)
     {
         buffer.resize(BUFFER_SIZE);
-#ifdef _WIN32
         int result = recv(sock, (char *)buffer.data(), BUFFER_SIZE, 0);
         if (result == SOCKET_ERROR)
         {
             std::cerr << "Recv failed with error code: " << WSAGetLastError() << std::endl;
             return -1;
         }
-#else
-        int result = recv(sock, buffer.data(), BUFFER_SIZE, 0);
-        if (result < 0)
-        {
-            std::cerr << "Recv error: " << strerror(errno) << std::endl;
-            return -1;
-        }
-#endif
         buffer.resize(result);
         return result;
     }
@@ -279,7 +173,6 @@ namespace Network
         while (totalReceived < count)
         {
             int chunk = std::min((size_t)65536, count - totalReceived);
-#ifdef _WIN32
             int result = recv(sock, (char *)(buffer.data() + totalReceived), chunk, 0);
             if (result == SOCKET_ERROR)
             {
@@ -291,19 +184,6 @@ namespace Network
                 std::cerr << "Connection closed by peer" << std::endl;
                 return (int)totalReceived;
             }
-#else
-            int result = recv(sock, buffer.data() + totalReceived, chunk, 0);
-            if (result < 0)
-            {
-                std::cerr << "Recv error: " << strerror(errno) << std::endl;
-                return -1;
-            }
-            if (result == 0)
-            {
-                std::cerr << "Connection closed by peer" << std::endl;
-                return (int)totalReceived;
-            }
-#endif
             totalReceived += result;
         }
 
@@ -404,23 +284,15 @@ namespace Network
     // Close socket
     void closeSocket(SocketHandle sock)
     {
-#ifdef _WIN32
         if (sock != INVALID_SOCKET)
         {
             closesocket(sock);
         }
-#else
-        if (sock != INVALID_SOCKET)
-        {
-            close(sock);
-        }
-#endif
     }
 
     // Get last error message
     std::string getLastErrorMessage()
     {
-#ifdef _WIN32
         int errorCode = WSAGetLastError();
         char *errorMsg = NULL;
         FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
@@ -430,9 +302,6 @@ namespace Network
         if (errorMsg)
             LocalFree(errorMsg);
         return result;
-#else
-        return std::string(strerror(errno));
-#endif
     }
 
 } // namespace Network

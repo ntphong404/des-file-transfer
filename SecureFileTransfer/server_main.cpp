@@ -21,13 +21,8 @@
 #include <string>
 #include <vector>
 
-#ifdef _WIN32
 #include <direct.h>   // _mkdir
 #include <windows.h>  // CreateDirectoryA
-#else
-#include <sys/stat.h>
-#include <sys/types.h>
-#endif
 
 using namespace DES;
 using namespace Network;
@@ -91,7 +86,6 @@ static std::wstring utf8ToWide(const std::string &s)
     return ws;
 }
 
-#ifdef _WIN32
 // Lấy args đúng từ GetCommandLineW() → UTF-8 (hỗ trợ tiếng Việt)
 static std::vector<std::string> getUtf8Args()
 {
@@ -108,16 +102,11 @@ static std::vector<std::string> getUtf8Args()
     LocalFree(wargv);
     return args;
 }
-#endif
 
 // Ensure a directory exists (create if not present)
 void ensureDirectory(const std::string &path)
 {
-#ifdef _WIN32
     CreateDirectoryW(utf8ToWide(path).c_str(), NULL);
-#else
-    mkdir(path.c_str(), 0755);
-#endif
 }
 
 // Sanitize filename: strip path separators to prevent directory traversal
@@ -152,16 +141,10 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-#ifdef _WIN32
     auto args = getUtf8Args();
     int port              = std::atoi(args[1].c_str());
     std::string outputDir = args[2];
     std::string keyStr    = args[3];
-#else
-    int port = std::atoi(argv[1]);
-    std::string outputDir = argv[2];
-    std::string keyStr    = argv[3];
-#endif
 
 
     if (port <= 0 || port > 65535)
